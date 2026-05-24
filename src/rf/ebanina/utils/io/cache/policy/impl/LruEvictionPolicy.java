@@ -5,18 +5,17 @@ import rf.ebanina.utils.io.cache.policy.ICacheEvictionPolicy;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class LruEvictionPolicy implements ICacheEvictionPolicy {
+public class LruEvictionPolicy
+        implements ICacheEvictionPolicy
+{
     private final long maxSizeBytes;
     private final double cleanupThreshold;
 
@@ -43,42 +42,46 @@ public class LruEvictionPolicy implements ICacheEvictionPolicy {
         this(maxSizeBytes, 0.8);
     }
 
+    private void lazyInit(Path rootDir) {
+        if (isInitialized.compareAndSet(false, true)) {
+            if (!Files.exists(rootDir)) return;
+
+            backgroundCleaner.submit(() -> {
+                try (Stream<Path> stream = Files.walk(rootDir)) {
+                    stream.filter(Files::isRegularFile).forEach(path -> {
+                        long size = path.toFile().length();
+                        long lastModified = path.toFile().lastModified();
+
+                        accessIndex.put(path, lastModified);
+                        currentCacheSize.addAndGet(size);
+                    });
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+    }
+
     @Override
     public void onPut(Path rootDir, Path targetFile) {
         if (!Files.exists(rootDir))
             return;
 
+        lazyInit(rootDir);
+
         try {
-            long currentSize;
-            try (Stream<Path> stream = Files.walk(rootDir)) {
-                currentSize = stream.filter(Files::isRegularFile)
-                        .mapToLong(p -> p.toFile().length())
-                        .sum();
+            long fileSize = Files.size(targetFile);
+
+            Long oldTime = accessIndex.put(targetFile, System.currentTimeMillis());
+            if (oldTime != null) {
+                currentCacheSize.addAndGet(fileSize - targetFile.toFile().length());
+            } else {
+                currentCacheSize.addAndGet(fileSize);
             }
 
-            if (currentSize <= maxSizeBytes) {
-                return;
+            if (currentCacheSize.get() > maxSizeBytes) {
+                triggerBackgroundCleanup();
             }
-
-            List<Path> filesSortedByLru;
-            try (Stream<Path> stream = Files.walk(rootDir)) {
-                filesSortedByLru = stream.filter(Files::isRegularFile)
-                        .sorted(Comparator.comparingLong(p -> p.toFile().lastModified()))
-                        .collect(Collectors.toList());
-            }
-
-            long targetSize = (long) (maxSizeBytes * cleanupThreshold);
-            for (Path file : filesSortedByLru) {
-                if (currentSize <= targetSize) {
-                    break;
-                }
-
-                long fileSize = Files.size(file);
-                if (Files.deleteIfExists(file)) {
-                    currentSize -= fileSize;
-                }
-            }
-
         } catch (IOException e) {
             System.err.println("Cache Eviction: Error during LRU cleanup execution. " + e.getMessage());
 
@@ -88,10 +91,53 @@ public class LruEvictionPolicy implements ICacheEvictionPolicy {
 
     @Override
     public void onGet(Path targetFile) {
-        if (Files.exists(targetFile)) {
+        accessIndex.computeIfPresent(targetFile, (path, oldTime) -> System.currentTimeMillis());
+    }
+
+    private void triggerBackgroundCleanup() {
+        if (isCleaningInProgress.compareAndSet(false, true)) {
+            backgroundCleaner.submit(() -> {
+                try {
+                    executeLruCleanup();
+                } finally {
+                    isCleaningInProgress.set(false);
+                }
+            });
+        }
+    }
+
+    private void executeLruCleanup() {
+        long currentSize = currentCacheSize.get();
+        if (currentSize <= maxSizeBytes)
+            return;
+
+        long targetSize = (long) (maxSizeBytes * cleanupThreshold);
+
+        java.util.List<Map.Entry<Path, Long>> sortedFiles = accessIndex.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue())
+                .toList();
+
+        for (Map.Entry<Path, Long> entry : sortedFiles) {
+            if (currentSize <= targetSize) {
+                break;
+            }
+
+            Path fileToDelete = entry.getKey();
             try {
-                targetFile.toFile().setLastModified(System.currentTimeMillis());
-            } catch (Exception ignored) {}
+                if (Files.exists(fileToDelete)) {
+                    long size = Files.size(fileToDelete);
+
+                    if (Files.deleteIfExists(fileToDelete)) {
+                        currentSize -= size;
+                        currentCacheSize.addAndGet(-size);
+                        accessIndex.remove(fileToDelete);
+                    }
+                } else {
+                    accessIndex.remove(fileToDelete);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
