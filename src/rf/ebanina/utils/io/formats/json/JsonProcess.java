@@ -1,4 +1,4 @@
-package rf.ebanina.utils.formats.json;
+package rf.ebanina.utils.io.formats.json;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -80,9 +80,6 @@ public class JsonProcess {
      *   <li>Создание {@code String[] res = new String[size()]}</li>
      *   <li>Iterator копирование: {@code it.next().toString()}</li>
      * </ol>
-     * </p>
-     * <p>
-     * <b>Ключевой метод Deezer:</b> {@code tracks[0]} для первого результата.
      * </p>
      * <p>
      * <b>Пример:</b>

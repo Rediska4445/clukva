@@ -1,4 +1,4 @@
-package rf.ebanina.utils.formats.xml;
+package rf.ebanina.utils.io.formats.xml;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
