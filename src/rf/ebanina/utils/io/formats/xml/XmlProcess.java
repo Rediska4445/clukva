@@ -12,53 +12,62 @@ import java.nio.charset.StandardCharsets;
 import java.util.TreeMap;
 
 public class XmlProcess {
-    public static TreeMap<String, String> parseXmlToTreeMap(String xmlString) throws Exception {
-        TreeMap<String, String> map = new TreeMap<>();
-
+    public static TreeMap<String, String> parseXmlToTreeMap(InputStream inputStream) throws Exception {
+        TreeMap<String, String> resultMap = new TreeMap<>();
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
-
-        byte[] bytes = xmlString.getBytes(StandardCharsets.UTF_8);
-        ByteArrayInputStream inputStream = new ByteArrayInputStream(bytes);
-
         Document doc = builder.parse(inputStream);
-        Element root = doc.getDocumentElement();
-        NodeList nodeList = root.getChildNodes();
+        doc.getDocumentElement().normalize();
 
-        for (int i = 0; i < nodeList.getLength(); i++) {
-            Node node = nodeList.item(i);
+        Element rootElement = doc.getDocumentElement();
+        parseElement(rootElement, "", resultMap);
 
-            if (node.getNodeType() == Node.ELEMENT_NODE) {
-                Element element = (Element) node;
-                String key   = element.getTagName();
-                String value = element.getTextContent().trim();
-                map.put(key, value);
-            }
-        }
-
-        return map;
+        return resultMap;
     }
 
-    public static TreeMap<String, String> parseXmlToTreeMap(InputStream inputStream) throws Exception {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        DocumentBuilder builder = factory.newDocumentBuilder();
-        Document doc = builder.parse(inputStream);
+    private static void parseElement(Element element, String currentPath, TreeMap<String, String> resultMap) {
+        NodeList children = element.getChildNodes();
 
-        Element root = doc.getDocumentElement();
-        NodeList nodeList = root.getChildNodes();
-
-        TreeMap<String, String> map = new TreeMap<>();
-        for (int i = 0; i < nodeList.getLength(); i++) {
-            Node node = nodeList.item(i);
+        for (int i = 0; i < children.getLength(); i++) {
+            Node node = children.item(i);
 
             if (node.getNodeType() == Node.ELEMENT_NODE) {
-                Element element = (Element) node;
-                String key   = element.getTagName();
-                String value = element.getTextContent().trim();
-                map.put(key, value);
+                Element childElement = (Element) node;
+                String nodeName = childElement.hasAttribute("name")
+                        ? childElement.getAttribute("name")
+                        : childElement.getTagName();
+
+                String nextPath = currentPath.isEmpty() ? nodeName : currentPath + "." + nodeName;
+
+                boolean hasChildElements = false;
+                NodeList subChildren = childElement.getChildNodes();
+                for (int j = 0; j < subChildren.getLength(); j++) {
+                    if (subChildren.item(j).getNodeType() == Node.ELEMENT_NODE) {
+                        hasChildElements = true;
+                        break;
+                    }
+                }
+
+                if (hasChildElements) {
+                    parseElement(childElement, nextPath, resultMap);
+                } else {
+                    String content = getElementContent(childElement);
+                    resultMap.put(nextPath, content);
+                }
             }
         }
+    }
 
-        return map;
+    private static String getElementContent(Element element) {
+        NodeList children = element.getChildNodes();
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeType() == Node.TEXT_NODE || child.getNodeType() == Node.CDATA_SECTION_NODE) {
+                sb.append(child.getNodeValue());
+            }
+        }
+        return sb.toString().trim();
     }
 }
