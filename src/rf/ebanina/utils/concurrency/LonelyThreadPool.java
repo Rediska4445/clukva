@@ -74,11 +74,15 @@ public class LonelyThreadPool
      * @param task новая задача для выполнения
      */
     public synchronized void runNewTask(Runnable task) {
+        closeTask();
+
+        currentTask = executor.submit(task);
+    }
+
+    public void closeTask() {
         if (currentTask != null && !currentTask.isDone()) {
             currentTask.cancel(true);
         }
-
-        currentTask = executor.submit(task);
     }
 
     /**
