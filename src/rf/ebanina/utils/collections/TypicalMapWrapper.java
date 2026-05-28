@@ -140,6 +140,18 @@ public class TypicalMapWrapper<K>
         return (T) typedValue.value();
     }
 
+    @SuppressWarnings("unchecked")
+    public <T> T getOrDefault(K key, T defaultValue, Class<T> type) {
+        T typedValue = get(key, type);
+
+        if (typedValue == null) {
+            return defaultValue;
+        }
+
+        return typedValue;
+    }
+
+
     /**
      * Добавляет значение по ключу с автоматическим определением типа через instanceof.
      * Тип сохраняется автоматически на основе реального типа {@code value}.
