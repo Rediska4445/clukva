@@ -4,57 +4,66 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import rf.ebanina.utils.io.formats.xml.dto.XmlData;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.TreeMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-public class XmlProcess {
-    public static TreeMap<String, String> parseXmlToTreeMap(InputStream inputStream) throws Exception {
-        TreeMap<String, String> resultMap = new TreeMap<>();
+public class Xml {
+    public static Map<String, XmlData> parseXmlToXmlData(InputStream inputStream) throws Exception {
+        Map<String, XmlData> rootMap = new LinkedHashMap<>();
+
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
         Document doc = builder.parse(inputStream);
         doc.getDocumentElement().normalize();
 
         Element rootElement = doc.getDocumentElement();
-        parseElement(rootElement, "", resultMap);
-
-        return resultMap;
-    }
-
-    private static void parseElement(Element element, String currentPath, TreeMap<String, String> resultMap) {
-        NodeList children = element.getChildNodes();
+        NodeList children = rootElement.getChildNodes();
 
         for (int i = 0; i < children.getLength(); i++) {
             Node node = children.item(i);
-
             if (node.getNodeType() == Node.ELEMENT_NODE) {
                 Element childElement = (Element) node;
                 String nodeName = childElement.hasAttribute("name")
                         ? childElement.getAttribute("name")
                         : childElement.getTagName();
 
-                String nextPath = currentPath.isEmpty() ? nodeName : currentPath + "." + nodeName;
-
-                boolean hasChildElements = false;
-                NodeList subChildren = childElement.getChildNodes();
-                for (int j = 0; j < subChildren.getLength(); j++) {
-                    if (subChildren.item(j).getNodeType() == Node.ELEMENT_NODE) {
-                        hasChildElements = true;
-                        break;
-                    }
-                }
-
-                if (hasChildElements) {
-                    parseElement(childElement, nextPath, resultMap);
-                } else {
-                    String content = getElementContent(childElement);
-                    resultMap.put(nextPath, content);
-                }
+                XmlData xmlData = new XmlData();
+                buildTree(childElement, xmlData);
+                rootMap.put(nodeName, xmlData);
             }
+        }
+
+        return rootMap;
+    }
+
+    private static void buildTree(Element element, XmlData currentData) {
+        NodeList children = element.getChildNodes();
+        boolean hasChildElements = false;
+
+        for (int i = 0; i < children.getLength(); i++) {
+            Node node = children.item(i);
+
+            if (node.getNodeType() == Node.ELEMENT_NODE) {
+                hasChildElements = true;
+                Element childElement = (Element) node;
+                String nodeName = childElement.hasAttribute("name")
+                        ? childElement.getAttribute("name")
+                        : childElement.getTagName();
+
+                XmlData childData = new XmlData();
+                currentData.getChildren().put(nodeName, childData);
+
+                buildTree(childElement, childData);
+            }
+        }
+
+        if (!hasChildElements) {
+            currentData.setData(getElementContent(element));
         }
     }
 

@@ -67,7 +67,9 @@ public class JsonProcess {
      * @return сырой JSONArray
      * @throws ParseException синтаксическая ошибка JSON
      */
-    public static JSONArray getRawArray(String rawJson) throws ParseException {
+    public static JSONArray getRawArray(String rawJson)
+            throws ParseException
+    {
         return ((JSONArray) (new JSONParser()).parse(rawJson));
     }
     /**
