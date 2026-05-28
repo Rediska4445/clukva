@@ -2,9 +2,9 @@
 
 Special utility toolkit for Java
 
-* Type-safe collections 
-* HTTP client 
-* Advanced logging 
+* Type-safe collections
+* HTTP client
+* Advanced logging
 * Concurrency
 
 ## Purpose

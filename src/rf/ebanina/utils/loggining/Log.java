@@ -454,7 +454,7 @@ public class Log
      * @param defaultVal значение по умолчанию, если ключ не найден
      * @return Значение параметра из файла или defaultVal
      */
-    public  String getConfigItem(String path, String item, String defaultVal) {
+    public String getConfigItem(String path, String item, String defaultVal) {
         if (config.containsKey(path)) {
             return config.get(path);
         }
@@ -477,6 +477,30 @@ public class Log
         return value;
     }
 
+    public void rotateLogs() {
+        String maxLogsStr = getConfigItem("file", "max", "10");
+        int maxLogs = Integer.parseInt(maxLogsStr);
+
+        File logDir = new File(getConfigItem("config" + File.separator + "log" + File.separator + "log.properties",
+                "output", "logs") + " - " +
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss.SSS")) + ".log");
+        if (!logDir.exists() || !logDir.isDirectory())
+            return;
+
+        File[] logFiles = logDir.listFiles((dir, name) -> name.endsWith(".log"));
+
+        if (logFiles != null && logFiles.length > maxLogs) {
+            Arrays.sort(logFiles, Comparator.comparingLong(File::lastModified));
+
+            int filesToDelete = logFiles.length - maxLogs;
+
+            for (int i = 0; i < filesToDelete; i++) {
+                if (!logFiles[i].delete())
+                    throw new RuntimeException("Log file is not deleted");
+            }
+        }
+    }
+
     /**
      * Инициализирует систему логирования, привязывая её к файловой системе.
      * <p>
@@ -488,7 +512,7 @@ public class Log
      *   <li><b>Определяет пути</b>: получает директории для вывода и ошибок из централизованной
      *       карты {@link Log#config}, что позволяет легко настраивать
      *       расположение логов без изменения кода.</li>
-     *   <li><b>Запускает процесс</b>: вызывает перегруженную версию {@link #init_file_log(String, String)}
+     *   <li><b>Запускает процесс</b>: вызывает перегруженную версию {@link #init_file_log(String)}
      *       с сгенерированными путями.</li>
      * </ol>
      * </p>
@@ -508,14 +532,13 @@ public class Log
      * C:/Users/AppData/Local/Ebanina/logs/out/ - 2025-10-11_20-30-45.123.log
      * }</pre>
      *
-     * @see #init_file_log(String, String)
+     * @see #init_file_log(String)
      * @see Properties
      * @since 0.0.9
      */
     public void init_file_log() {
-        init_file_log(getConfigItem("config" + File.separator + "log" + File.separator + "log.properties", "output", "logs") + " - " +
-                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss.SSS")) + ".log",
-                getConfigItem("config" + File.separator + "log" + File.separator + "log.properties",  "errors", "logs") + " - " +
+        init_file_log(getConfigItem("config" + File.separator + "log" + File.separator + "log.properties",
+                        "output", "logs") + " - " +
                         LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss.SSS")) + ".log");
     }
 
@@ -560,26 +583,25 @@ public class Log
      * @see FileOutputStream
      * @since 0.0.9
      */
-    public void init_file_log(String out, String err) {
+    public void init_file_log(String out) {
         try {
             Path path = Paths.get(out);
-
-            if (!Files.exists(path.getParent())) {
-                Files.createDirectory(path.getParent());
+            if (path.getParent() != null && !Files.exists(path.getParent())) {
+                Files.createDirectories(path.getParent());
             }
 
-            PrintStream outLog = new PrintStream(new java.io.FileOutputStream(out));
-            PrintStream errLog = new PrintStream(new java.io.FileOutputStream(err));
+            java.io.FileOutputStream fileStream = new java.io.FileOutputStream(out, true);
+            PrintStream filePrintStream = new PrintStream(fileStream);
 
             PrintStream dualOut = new PrintStream(new FileOutputStream(
                     this, System.out,
-                    outLog,
+                    filePrintStream,
                     FileOutputStream.FILE_LOG_PROCESSOR
             ));
 
             PrintStream dualErr = new PrintStream(new FileOutputStream(
                     this, System.err,
-                    errLog,
+                    filePrintStream,
                     FileOutputStream.FILE_LOG_PROCESSOR
             ));
 
@@ -590,10 +612,7 @@ public class Log
         }
     }
 
-    //TODO: Сделать загрузку через файл
-    public final Map<Level, Boolean> levelMap = new HashMap<>(
-
-    );
+    public final Map<Level, Boolean> levelMap = new HashMap<>();
 
     public static class Level {
         String code;

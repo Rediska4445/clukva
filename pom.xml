@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>mizuka</groupId>
-    <artifactId>mizuka-std-utils</artifactId>
-    <version>1.3.1</version>
+    <groupId>clukva</groupId>
+    <artifactId>mizuki-std-utils</artifactId>
+    <version>1.3.3</version>
 
     <packaging>jar</packaging>
 
