@@ -1,5 +1,7 @@
 # Clukva (Special for Mizuki)
 
+[![](https://jitpack.io/v/Rediska4445/clukva.svg)](https://jitpack.io/#Rediska4445/clukva)
+
 Special utility toolkit for Java
 
 * Type-safe collections
