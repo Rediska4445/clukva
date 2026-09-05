@@ -18,8 +18,8 @@ Add to module path or classpath:
 ```xml
 <!-- Maven -->
 <dependency>
-    <groupId>rf.ebanina</groupId>
-    <artifactId>utils</artifactId>
-    <version>1.0</version>
+    <groupId>com.github.Rediska4445</groupId>
+    <artifactId>clukva</artifactId>
+    <version>Tag</version>
 </dependency>
 ```
